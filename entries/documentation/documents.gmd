@@ -1,0 +1,138 @@
+---
+[metadata]
+title=Documents
+documentation=1
+[options]
+layout=layouts/page.php
+---
+
+Documents wrap the actual document that gets classified (whatever that
+may be). A document can be anything from a single word to a word with
+context or maybe a whole email with metadata about previous conversations.
+
+### The Document interface ###
+
+~~~ php
+interface Document
+{
+	/*
+	 * Return the data of what is being represented. If it were a word
+	 * we could return a word. If it were a blog post we could return
+	 * an array(Title,Body,array(Comments)).
+	 * 
+	 * @return mixed
+	 */
+	 public function getDocumentData();
+}
+~~~
+
+Document is very generic and it can return anything as its data. It
+is, though, useful to design generic document classes that can be used
+by purpose-specific [feature factories](documentation/feature-factories.html).
+
+With the mindset expressed above, NlpTools already contains two generic
+document types that could be used for many applications.
+
+1. TokensDocument
+2. WordDocument
+
+### TokensDocument ###
+
+TokensDocument is useful for feature factories and algorithms that use
+the ["Bag of words"]() model for representing a large group of text.
+It wraps an array of tokens and simply returns this array as the data.
+
+To continue the tokenizers' example.
+
+~~~ php
+use \NlpTools\Tokenizers\WhitespaceTokenizer;
+use \NlpTools\Documents\TokensDocument;
+
+$s1 = "Please allow me to introduce myself
+		I'm a man of wealth and taste";
+$s2 = "Hello, I love you, won't you tell me your name
+		Hello, I love you, let me jump in your game";
+
+$tok = new WhitespaceTokenizer();
+
+
+$stones = new TokensDocument($tok->tokenize($s1)); // $stones now represents the "Sympathy for the devil" song
+$doors = new TokensDocument($tok->tokenize($s2)); // $doors now represents the "Hello, I love you" song
+~~~
+
+### WordDocument ###
+
+WordDocument represents a single token (usually a word) surrounded by a
+token context of some length. It is useful for representing certain
+elements, like person names, places, etc, in the context of a larger
+piece of text.
+
+To illustrate the difference from above.
+
+~~~ php
+use \NlpTools\Tokenizers\WhitespaceTokenizer;
+use \NlpTools\Documents\WordDocument;
+
+$s1 = "Please allow me to introduce myself
+		I'm a man of wealth and taste";
+$s2 = "Hello, I love you, won't you tell me your name
+		Hello, I love you, let me jump in your game";
+
+$tok = new WhitespaceTokenizer();
+
+
+$stones = new WordDocument(
+	$tok->tokenize($s1),
+	2,
+	4
+); // $stones now represents the word 'me' in the context of 4
+   // surrounding words in any direction
+
+$doors = new WordDocument(
+	$tok->tokenize($s2),
+	7,
+	4
+); // $doors now also represents the word 'me' in the context of 4
+   // surrounding words in any direction
+~~~
+
+Because we have also captured the context of those words, above, we can
+distinguish them and produce different features.
+
+### Training document and Training set ###
+
+In the Documents namespace there exist two more classes created to make
+working with documents a lot easier.
+
+_TrainingDocument_ is a simple wrapper for any Document class that
+also contains the label (or class) information regarding that specific
+Document instance. Thus, TrainingDocument is useful for supervised
+learning where the model is trained on documents whose labels are known
+beforehand.
+
+~~~ php
+// $d is a Document instance
+$td = new TrainingDocument('CLASS 1',$d);
+var_dump($td->getClass()); // CLASS 1
+var_dump($td->getDocumentData()); // $d->getDocumentData()
+~~~
+
+_TrainingSet_ is a TrainingDocument container. Besides adding an easier
+way of instanciating TrainingDocuments it also provides the useful
+\Iterator, \ArrayAccess and \Countable interfaces for manipulating many
+TrainingDocuments .
+
+~~~ php
+$tset = new TrainingSet();
+$tset->addDocument('CLASS 1',$a);
+foreach ($tset as $class=>$d) {
+	...
+}
+~~~
+
+<div style="text-align: center;" markdown="1">
+[&laquo; Tokenizers](documentation/tokenizers.html)
+/
+[Feature Factories &raquo;](documentation/feature-factories.html)
+</div>
+

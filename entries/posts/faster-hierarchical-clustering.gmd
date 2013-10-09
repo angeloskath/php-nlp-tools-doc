@@ -1,0 +1,81 @@
+---
+[metadata]
+created = Fri, Jun 7 2013 00:27 UTC
+
+title = "O(n<sup>2</sup>logn) hierarchical clustering"
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+[Hierarchical clustering][hc] is the process in which given a dissimilarity matrix
+between documents one has to join those that are most similar and update the
+matrix given an update strategy ([single][single_link]/[complete link][complete_link],
+[group average][group_average], etc)
+
+### Naive case ###
+
+The above process, in the general case, is of complexity O(n<sup>3</sup>) since we have
+to traverse n<sup>2</sup> elements (in the matrix) and find their minimum and we have to do
+this n times. If one does code it this way, especially in PHP that is a relatively
+slow language, the maximum number of documents that can be clustered in a reasonable
+time (less than a day) is about 1000 (depending heavily on the computer).
+
+### Improving the general case  ###
+
+One could improve the general case of O(n<sup>3</sup>) simply by noticing that most of
+the time is spent looking for a minimum. If we use a [heap][heap_wiki] instead of
+a matrix, then finding the minimum is an O(1) operation. Yet inserting and removing from
+the heap (as we updated the matrix previously) is an O(logn) operation and we have to do it
+n times for each merge. Thus the new complexity of the algorithm is now O(n<sup>2</sup>logn)
+which improves substantially the usefulness of the algorithm in php. (_for instance if n=1000
+we improve the running time approximately by 100_).
+
+### As fast as possible ###
+
+More than 40 years ago Mr. Sibson developed the [SLINK][slink_link] algorithm for single link
+hierarchical clustering, based on a new mathematical representation of a [dendrogram][dendrogram_link]
+he devised an algorithm with time complexity O(n<sup>2</sup>). It is easily provable that no
+algorithm can be asymptotically faster than that. The SLINK algorithm, although easy to write
+in code, it deviates quite a lot from intuition in the sense that the algorithm does not
+merge two clusters n times untill all clusters are merged into one but instead it recursively updates
+the dendrogram from having i points to having i+1 points (thus the new dendrogram representation).
+
+### What is NlpTools using ###
+
+PHP is a relatively slow language (captain obvious). The fastest algorithm possible should be used
+in order to achieve usable (or good) performance. That being said, NlpTools except for a toolkit
+and library for NLP, it also aims to be a good resource for introduction to machine
+learning and NLP algorithms. Thus, sometimes a simpler solution is chosen than the faster one.
+
+The first implementation of hierarchical clustering in NlpTools will be using a [custom made
+heap][php_associative_heap] that makes it easy to understand what is going on in the _Hierarchical_
+class that implements the [Clusterer interface][clusterer_interface] and yet provides much better
+performance than the naive implementation.
+
+### What about SLINK and CLINK ###
+
+Those algorithms will probably be added in the clustering namespace as two completely new classes
+that provide the same results as using _Hierarchical_ with SingleLink and CompleteLink strategies
+accordingly. Top priority though is to implement yet more merge strategies like Ward and Centroid.
+
+### And a beautiful looking dendrogram? ###
+
+<img src="/files/clustering/dendrogram_1.png" class="border" />
+
+<img src="/files/clustering/hierarchical_1.png" class="border" />
+
+The clustering above is done using single link hierarchical clustering with euclidean distance.
+The images were created using gd in php and the code is included in NlpTools as tests for the
+clustering namespace.
+
+[hc]: http://en.wikipedia.org/wiki/Hierarchical_clustering
+[single_link]: http://en.wikipedia.org/wiki/Single-linkage_clustering
+[complete_link]: http://en.wikipedia.org/wiki/Complete_linkage_clustering
+[group_average]: http://en.wikipedia.org/wiki/Complete_linkage_clustering
+[heap_wiki]: http://en.wikipedia.org/wiki/Heap_(data_structure)
+[slink_link]: http://www.cs.gsu.edu/~wkim/index_files/papers/sibson.pdf
+[dendrogram_link]: https://en.wikipedia.org/wiki/Dendrogram
+[php_associative_heap]: https://github.com/angeloskath/php-associative-heap
+[clusterer_interface]: http://php-nlp-tools.com/documentation/api/#NlpTools/Clustering/Clusterer

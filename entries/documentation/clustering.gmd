@@ -1,0 +1,128 @@
+---
+[metadata]
+title=Clustering
+documentation=1
+[options]
+layout=layouts/page.php
+---
+
+> Cluster analysis or clustering is the task of grouping a set of objects in such a 
+> way that objects in the same group (called cluster) are more similar (in some sense
+> or another) to each other than to those in other groups (clusters).
+> <cite>Wikipedia</cite>
+
+The [NlpTools\Clustering][clustering_namespace] namespace will contain a number of clustering
+algorithms to be used with the library. At the moment of writing this, K-Means is the only algorithm
+published in the master branch with hierarchical clustering soon to follow and Expectation
+Maximization a bit later.
+
+### Interfaces ###
+
+All clustering methods extends the abstract class [Clusterer][clusterer] and implement the following
+abstract method.
+
+~~~ php
+abstract class Clusterer
+{
+	...
+	abstract public function cluster(TrainingSet $tset, FeatureFactory $ff);
+	...
+}
+~~~
+
+The clusterers should return an array containing as a first element the clusters (an array
+with grouped document indices) and any other data produced by the clustering (ex.: centroids and
+distances for K-Means).
+
+### KMeans ###
+
+[KMeans][kmeans_wiki] is a very popular, simple and fast clustering algorithm. It minimizes the within
+cluster sum of square distances from each point to the corresponding centroid. It can be implemented
+with any metric of distance coupled with a centroid generation strategy. In NlpTools this means that
+the KMeans instance receives a [Distance ][similarity_docs] instance and a new class, a
+[CentroidFactory][centroid_factories_docs].
+
+#### Centroid Factories ####
+
+The centroid factories are usually coupled with a distance metric and simply produce a new data point,
+given a set of points, such that the sum of the distances of this point to every point in the set is
+minimized. In NlpTools there are a number of CentroidFactories already defined:
+<dl>
+	<dt markdown="1">[Euclidean][euclidean_cf]</dt>
+	<dd>Simply the centroid of the points in the euclidean space (x_1 + x_2 + ...)/n</dd>
+	<dt markdown="1">[Hamming][hamming_cf]</dt>
+	<dd>
+		A new number that the sum of the hamming distance from every number in
+		the provided set is minimized
+	</dd>
+	<dt markdown="1">[MeanAngle][mean_angle_cf]</dt>
+	<dd>
+		Compute a unit vector in the euclidean space such that the sum of the cosine similarities
+		between the centroid and every other vector in the set is maximized
+		(cosine distance minimized)
+	</dd>
+</dl>
+
+You can see a very simple [example][kmeans_example] (with semi decent visualization if you have gd)
+in the tests of NlpTools and a very simple one that follows.
+
+~~~ php
+use NlpTools\Clustering\KMeans;
+use NlpTools\Similarity\Euclidean;
+use NlpTools\Clustering\CentroidFactories\Euclidean as EuclideanCF;
+use NlpTools\Documents\TrainingSet;
+use NlpTools\Documents\TokensDocument;
+use NlpTools\FeatureFactories\DataAsFeatures;
+
+$tset = new TrainingSet();
+$tset->addDocument(
+	'', //class is not used so it can be empty
+	new TokensDocument(array('x'=>0,'y'=>0))
+);
+$tset->addDocument(
+	'', //class is not used so it can be empty
+	new TokensDocument(array('x'=>1,'y'=>0))
+);
+$tset->addDocument(
+	'', //class is not used so it can be empty
+	new TokensDocument(array('x'=>0,'y'=>1))
+);
+$tset->addDocument(
+	'', //class is not used so it can be empty
+	new TokensDocument(array('x'=>3,'y'=>3))
+);
+$tset->addDocument(
+	'', //class is not used so it can be empty
+	new TokensDocument(array('x'=>2,'y'=>3))
+);
+$tset->addDocument(
+	'', //class is not used so it can be empty
+	new TokensDocument(array('x'=>3,'y'=>2))
+);
+
+$clust = new KMeans(
+	2, // two clusters
+	new Euclidean(),
+	new EuclideanCF()
+);
+
+print_r(
+	$clust->cluster($tset, new DataAsFeatures())
+);
+~~~
+
+<div style="text-align: center;" markdown="1">
+[&laquo; Similarity](documentation/similarity.html)
+</div>
+
+[clustering_namespace]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering
+[clusterer]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\Clusterer
+[kmeans_wiki]: http://en.wikipedia.org/wiki/Kmeans
+[similarity_docs]: /documentation/similarity.html
+[centroid_factories_docs]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories
+[euclidean_cf]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories\Euclidean
+[hamming_cf]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories\Hamming
+[mean_angle_cf]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories\MeanAngle
+[kmeans_example]: https://github.com/angeloskath/php-nlp-tools/tree/master/tests/clustering/kmeans/kmeans_test.php
+
+

@@ -1,0 +1,90 @@
+---
+[metadata]
+created = Fri, May 10 2013 14:21 UTC
+
+title = Text clustering
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+In this article I will introduce one thing that has been missing from
+NlpTools, clustering. The base similarity concepts have long been included
+in NlpTools and it was a matter of time to implement some clustering methods.
+
+### Current status ###
+
+So far only KMeans has been implemented and I have not yet published it.
+KMeans is, probably, the simplest clustering algorithm and one of the
+fastest. It allows for clustering with many distance metrics (euclidean,
+cosine similarity, hamming, etc). Combined with [simhash][simhash-api-link]
+it can be used to cluster big corpuses even in php.
+
+### Examples ###
+
+Simple euclidean clustering at two dimensions.
+
+~~~ php
+use NlpTools\Clustering\KMeans;
+use NlpTools\Clustering\CentroidFactories\Euclidean as EuclideanCF;
+use NlpTools\Similarity\Euclidean;
+
+$clust = new KMeans(
+	2, // 2 clusters
+	new Euclidean(), // the distance metric
+	                 // must implement Distance interface
+	new EuclideanCF(), // how we will be creating centroids
+	0.001 // the cutoff value (can be ommited)
+);
+
+$clust->cluster(
+	$tset, // a training set
+	$ff // a feature factory that will transform the document data
+	    // to data compatible with the distance metric and the
+		// centroid factory
+);
+~~~
+
+<img src="/files/clustering/euclidean_2.png" class="border" />
+
+The only thing that needs to change, in order to cluster using cosine
+similarity at two dimensions, is the parameters at the initialization
+of the KMeans class.
+
+~~~ php
+use NlpTools\Clustering\KMeans;
+use NlpTools\Clustering\CentroidFactories\MeanAngle;
+use NlpTools\Similarity\CosineSimilarity;
+
+$clust = new KMeans(
+	4, // 4 clusters
+	new CosineSimilarity(), // the distance metric
+	new MeanAngle(), // how we will be creating centroids
+	0.001 // the cutoff value (can be ommited)
+);
+~~~
+
+<img src="/files/clustering/cosine_4.png" class="border" />
+
+### Future ###
+
+NlpTools will also contain the following clustering methods
+
+* Hierarchical clustering
+* Expectation Maximization clustering (probably with Naive Bayes model)
+
+Moreover I plan to add some tools for internal evaluation of clusters (silhouette, SSE, Correlation).
+
+### Backwards incompatible changes ###
+
+When the clustering branch is merged with the master branch the following backwards incompatible changes will take place.
+
+* SetDistance and SetSimilarity, the similarity and distance interfaces
+  accordingly are renamed to Distance and Similarity
+* The above interfaces no longer require arrays as parameters, thus we
+  could even define the distance between two strings without the need to
+  split those strings in character sets
+
+[simhash-api-link]: http://www.php-nlp-tools.local/documentation/api/#NlpTools\Similarity\Simhash
+

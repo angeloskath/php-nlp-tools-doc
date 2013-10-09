@@ -1,0 +1,165 @@
+---
+[metadata]
+created = Tue, Apr 25 2013 19:08 UTC
+
+title = Introducing Latent Dirichlet Allocation
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+In this article I will introduce work still in progress in NlpTools,
+Latent Dirichlet Allocation with batch Gibbs sampling. I haven't
+updated the API Docs yet so one can only see the API by looking to the
+[code][lda_model_code].
+
+The implementation is based on the paper by [Griffiths and Steyvers][griffiths_steyvers_paper].
+With this new model a new namespace is also introduced in NlpTools (although
+it is arguable if it will stay) the NlpTools\Random namespace. It provides
+useful constructs for dealing with random distributions. As always it is
+coded in an as needed basis and only Gamma, Dirichlet and Normal distributions
+are implemented (much based on <http://www.johndcook.com/SimpleRNG.cpp>)
+
+I would also like to mention [Mathieu Blondel's python implementation][python_lda] that
+helped seriously in debugging mine and from which I took the log likelihood
+implementation.
+
+### A graphical example ###
+
+The implementation comes with an accompanying test, the beautiful
+graphical example used by Griffiths and Steyvers in their own paper.
+
+We create a set of documents (images) while sticking to the model's
+assumptions, sampling each topic from a Dirichlet distribution.
+
+Topics:
+
+<img src="/files/lda/topics/topic-0" class="border" />
+<img src="/files/lda/topics/topic-1" class="border" />
+<img src="/files/lda/topics/topic-2" class="border" />
+<img src="/files/lda/topics/topic-3" class="border" />
+<img src="/files/lda/topics/topic-4" class="border" />
+
+<img src="/files/lda/topics/topic-5" class="border" />
+<img src="/files/lda/topics/topic-6" class="border" />
+<img src="/files/lda/topics/topic-7" class="border" />
+<img src="/files/lda/topics/topic-8" class="border" />
+<img src="/files/lda/topics/topic-9" class="border" />
+
+Examples of generated documents:
+
+<img src="/files/lda/documents/74" class="border" />
+<img src="/files/lda/documents/75" class="border" />
+<img src="/files/lda/documents/87" class="border" />
+<img src="/files/lda/documents/90" class="border" />
+<img src="/files/lda/documents/93" class="border" />
+
+Topics found in 1st iteration (log likelihood -278203.915):
+
+<img src="/files/lda/results/topic-0001-0000" class="border" />
+<img src="/files/lda/results/topic-0001-0001" class="border" />
+<img src="/files/lda/results/topic-0001-0002" class="border" />
+<img src="/files/lda/results/topic-0001-0003" class="border" />
+<img src="/files/lda/results/topic-0001-0004" class="border" />
+
+<img src="/files/lda/results/topic-0001-0005" class="border" />
+<img src="/files/lda/results/topic-0001-0006" class="border" />
+<img src="/files/lda/results/topic-0001-0007" class="border" />
+<img src="/files/lda/results/topic-0001-0008" class="border" />
+<img src="/files/lda/results/topic-0001-0009" class="border" />
+
+Topics found in 5th iteration (log likelihood -205116.986):
+
+<img src="/files/lda/results/topic-0005-0000" class="border" />
+<img src="/files/lda/results/topic-0005-0001" class="border" />
+<img src="/files/lda/results/topic-0005-0002" class="border" />
+<img src="/files/lda/results/topic-0005-0003" class="border" />
+<img src="/files/lda/results/topic-0005-0004" class="border" />
+
+<img src="/files/lda/results/topic-0005-0005" class="border" />
+<img src="/files/lda/results/topic-0005-0006" class="border" />
+<img src="/files/lda/results/topic-0005-0007" class="border" />
+<img src="/files/lda/results/topic-0005-0008" class="border" />
+<img src="/files/lda/results/topic-0005-0009" class="border" />
+
+Topics found in 50th iteration (log likelihood -133652.225):
+
+<img src="/files/lda/results/topic-0050-0000" class="border" />
+<img src="/files/lda/results/topic-0050-0001" class="border" />
+<img src="/files/lda/results/topic-0050-0002" class="border" />
+<img src="/files/lda/results/topic-0050-0003" class="border" />
+<img src="/files/lda/results/topic-0050-0004" class="border" />
+
+<img src="/files/lda/results/topic-0050-0005" class="border" />
+<img src="/files/lda/results/topic-0050-0006" class="border" />
+<img src="/files/lda/results/topic-0050-0007" class="border" />
+<img src="/files/lda/results/topic-0050-0008" class="border" />
+<img src="/files/lda/results/topic-0050-0009" class="border" />
+
+### Usage ###
+
+For example the following code finds the topics of an array of
+text documents.
+
+~~~ php
+use NlpTools\FeatureFactories\DataAsFeatures;
+use NlpTools\Tokenizers\WhitespaceTokenizer;
+use NlpTools\Documents\TokensDocument;
+use NlpTools\Documents\TrainingSet;
+use NlpTools\Models\Lda;
+
+// supposedly the list of documents is in a file that is passed
+// as first parameter
+if (file_exists($argv[1])
+	$docs = file($argv[1]);
+else
+	die(1);
+
+$tok = new WhitespaceTokenizer();
+$tset = new TrainingSet();
+foreach ($docs as $f) {
+	$tset->addDocument(
+		'', // the class is not used by the lda model
+		new TokensDocument(
+			$tok->tokenize(
+				file_get_contents($f)
+			)
+		)
+	);
+}
+
+$lda = new Lda(
+	new DataAsFeatures(), // a feature factory to transform the document data
+	5, // the number of topics we want
+	1, // the dirichlet prior assumed for the per document topic distribution
+	1  // the dirichlet prior assumed for the per word topic distribution
+);
+
+// run the sampler 50 times
+$lda->train($tset,50);
+
+// synonymous to calling getPhi() as per Griffiths and Steyvers
+// it returns a mapping of words to probabilities for each topic
+// ex.:
+// Array(
+//   [0] => Array(
+//      [word1] => 0.0013...
+//      ....................
+//      [wordn] => 0.0001...
+//     ),
+//   [1] => Array(
+//      ....
+//     )
+// )
+print_r(
+	// $lda->getPhi(10)
+	// just the 10 largest probabilities
+	$lda->getWordsPerTopicsProbabilities(10)
+);
+~~~
+
+
+[lda_model_code]: https://github.com/angeloskath/php-nlp-tools/blob/master/models/lda.php
+[griffiths_steyvers_paper]: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC387300/
+[python_lda]: http://gist.github.com/542786

@@ -1,0 +1,123 @@
+---
+[metadata]
+created = Tue, Sep 3 2013 14:21 UTC
+
+title = Dbscan text clustering
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+In this article I will be introducing *Density Based Spatial Clustering of Applications with Noise*, known as DBSCAN.
+DBSCAN is the latest addition to the Clustering namespace of php (it is still under development and not merged into
+master).
+
+> DBSCAN is a density based clustering algorithm because
+> it finds a number of clusters starting from the estimated
+> density distribution of corresponding nodes
+>
+> <cite>Wikipedia</cite>
+
+### Dbscan Implementation ###
+
+The current implementation in NlpTools takes as a parameter an object that implements SpatialIndexInterface. 
+
+~~~ php
+// comments stripped
+interface SpatialIndexInterface
+{
+    public function setDistanceMetric(Distance $d);
+    public function index(array &$docs);
+    public function add($doc);
+
+    public function regionQuery($doc, $e);
+    public function kNearestNeighbors($doc, $k);
+}
+~~~
+
+This is used to abstract away the logic of searching a set of points for neighbors so that this process can be
+optimized. For instance we could implement [k-d trees](http://en.wikipedia.org/wiki/K-d_tree) or ball trees for
+faster neighbor searching. The current implementation uses naive linear search and has complexity *O(n<sup>2</sup>)*.
+
+### Examples ###
+
+~~~ php
+use NlpTools\Clustering\Dbscan;
+use NlpTools\Similarity\Euclidean;
+use NlpTools\Documents\TrainingSet;
+use NlpTools\FeatureFactories\DataAsFeatures;
+
+$tset = new TrainingSet();
+// load the training set with documents
+
+// create a large outer circle of points
+for ($i=0.0;$i<2*M_PI;$i+=M_PI/20) {
+	$tset->addDocument(
+		'A',
+		EuclideanPoint::getRandomPointAround(
+			150+70*cos($i),
+			100+70*sin($i),
+			8
+		)
+	);
+	$tset->addDocument(
+		'A',
+		EuclideanPoint::getRandomPointAround(
+			150+70*cos($i),
+			100+70*sin($i),
+			8
+		)
+	);
+}
+
+// create an inner smaller circle of points
+for ($i=0.0;$i<2*M_PI;$i+=M_PI/10) {
+	$tset->addDocument(
+		'B',
+		EuclideanPoint::getRandomPointAround(
+			150+20*cos($i),
+			100+20*sin($i),
+			8
+		)
+	);
+	$tset->addDocument(
+		'B',
+		EuclideanPoint::getRandomPointAround(
+			150+20*cos($i),
+			100+20*sin($i),
+			8
+		)
+	);
+}
+
+// we are stating that we consider a region to be dense
+// if it has at least 4 points in a circle of radius 20
+$clust = new Dbscan(
+	4,  			// the minimum number of points needed
+	20, 			// the radius in which we are looking for points
+	new Euclidean() // we will use the Euclidean distance
+);
+
+// do the actual clustering
+list($clusters,$noise) = $clust->cluster($tset, new DataAsFeatures());
+~~~
+
+The above code creates a very simple dataset with two distinct clusters in the two-dimensional euclidean space.
+This simple dataset is often used as an example to illustrate the differences between DBSCAN and K-Means.
+
+<span title="K-Means" class="with-caption">
+	<img src="/files/clustering/kmeans_circles.png" class="border" alt="K-Means" />
+</span>
+<span title="DBSCAN" class="with-caption">
+	<img src="/files/clustering/dbscan_circles.png" class="border" alt="DBSCAN" />
+</span>
+<b class="clear">
+	&nbsp;
+</b>
+
+The second example that follows illustrates the property of DBSCAN to identify noise points and determine the
+number of clusters in the datatset. The dark blue points are noise. The points to be clustered are uniformly random.
+
+<img src="/files/clustering/dbscan_1.png" class="border" />
+<img src="/files/clustering/dbscan_2.png" class="border" />

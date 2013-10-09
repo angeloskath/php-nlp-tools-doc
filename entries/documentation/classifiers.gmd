@@ -1,0 +1,60 @@
+---
+[metadata]
+title=Classifiers
+documentation=1
+[options]
+layout=layouts/page.php
+---
+
+> In machine learning classification is the problem of identifying in
+> which of a set of categories (classes) a new observation belongs.
+> <cite>Wikipedia</cite>
+
+### Interface ###
+
+The Classifier interface contains only the function classify that
+receives the set of categories (classes) and a Document which contains
+all the data of a new observation and returns a predicted class for
+the Document.
+
+~~~ php
+interface Classifier
+{
+	/**
+	 * Decide in which class C member of $classes would $d fit best.
+	 * 
+	 * @param array $classes A set of classes
+	 * @param Document $d A Document
+	 * @return string A class
+	 */
+	public function classify(array $classes, Document $d);
+}
+~~~
+
+### Feature based linear classifier ###
+
+This classifier needs a [Feature Factory](documentation/feature-factories.html)
+and a [Linear Model](documentation/api/#NlpTools\Models\LinearModel).
+
+For a given document and a class the _feature vector_ is computed. Through
+a linear combination with the weights of the [Linear Model](documentation/api/#NlpTools\Models\LinearModel)
+a vote for the given class _C<sub>i</sub>_ is computed. The class _C_
+that maximizes the vote is the predicted class.
+
+### Multinomial Naive Bayes Classifier ###
+
+This classifier also needs a [Feature Factory](documentation/feature-factories.html).
+In addition it needs a [Multinomial Naive Bayes Model](documentation/api/#NlpTools\Models\MultinomialNBModel).
+
+You can find a thorough explanation of this method by the [Stanford NLP department](http://nlp.stanford.edu/IR-book/html/htmledition/naive-bayes-text-classification-1.html).
+
+In short, the probability of a document _d_ belonging in the class _c_
+is computed using the prior probablities of the classes and the
+assumption that each indicator random variable (the features in our case)
+is independent with any other.
+
+<div style="text-align: center;" markdown="1">
+[&laquo; Feature Factories](documentation/feature-factories.html)
+/
+[Bayesian Model &raquo;](documentation/bayesian-model.html)
+</div>

@@ -1,0 +1,96 @@
+---
+[metadata]
+created = Thu, Jun 20 2013 15:17 UTC
+
+title = Maximum entropy model for sentiment detection
+project = Sentiment detection
+projectpath = /blog/category/sentiment-detection
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+In the second post in the series of [sentiment detection][sentiment-detection-series] we will train a
+maximum entropy model to perform the exact same classification on the exact same data and compare the
+procedure and the results.
+
+### Getting the optimizer ###
+
+Later on NlpTools will support more external optimizers like Megam or Mallet but for now the only
+optimizer supported is the one developed specifically for NlpTools in [Go](http://golang.org/) that
+performs parallel batch gradient descent.
+
+You can download binaries for you architecture or build from source.
+
+* [linux/386](/files/sentiment-detection/optimizer/gradient-descent-linux-386)
+* [linux/amd64](/files/sentiment-detection/optimizer/gradient-descent-linux-amd64)
+* [windows/386](/files/sentiment-detection/optimizer/gradient-descent-windows-386.exe)
+* [windows/amd64](/files/sentiment-detection/optimizer/gradient-descent-windows-amd64.exe)
+* [source](https://github.com/angeloskath/nlp-maxent-optimizer)
+
+### Training a Maximum Entropy model ###
+
+There are only three changes required (to our previous file) to train and evaluate a Maxent model
+instead of a Naive Bayes model.
+
+#### Feature Factory ####
+
+You need to create a different type of feature factory. In Maxent features should target specific classes
+so in each feature the class name should be prepended. In addition, we should model presence and not
+frequency of features. To achieve the above we will use the FeatureFactory
+[FunctionFeatures][function-features-apidoc].
+
+~~~ php
+$ff = new FunctionFeatures(
+	array(
+		function ($c, $d) {
+			return array_map(
+				function ($t) use($c) {
+					return "$c ^ $t"; // target the feature to a specific class
+				},
+				$d->getDocumentData()
+			);
+		}
+	)
+);
+~~~
+
+#### Model instantiation ####
+
+We should change the model instatiation code to now create and train a Maxent model.
+
+~~~ php
+// create empty Maxent
+$model = new Maxent(array());
+
+$model->train(
+	$ff, // the feature factory
+	$tset, // the documents
+	new ExternalMaxentOptimizer(
+		'gradient-descent' // the path to the external optimizer
+	)
+);
+~~~
+
+#### Classifier ####
+
+Finally, we need to change the classifier from MultinomialNaiveBayes to FeatureBasedLinearClassifier.
+
+~~~ php
+$cls = new FeatureBasedLinearClassifier($ff, $model);
+~~~
+
+We then run the php script with the exact same parameters as in the previous post. Training time will
+take longer this time.
+
+### Results ###
+
+Maximum entropy models usually perform a bit better than Naive Bayes (on par with SVM). They are, though,
+much harder to train. Our model confirms the rule by achieving __86%__ accuracy on
+[Pang's and Lee's][pang-lee-paper] dataset (No features other than the data).
+
+
+[pang-lee-paper]: http://www.cs.cornell.edu/home/llee/papers/sentiment.home.html
+[sentiment-detection-series]: /blog/category/sentiment-detection
+[function-features-apidoc]: /documentation/api/#NlpTools/FeatureFactories/FunctionFeatures

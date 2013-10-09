@@ -1,0 +1,99 @@
+---
+[metadata]
+created = Thu, Mar 7 2013 20:22 UTC
+
+title = Spam detection as a service
+project = Spam detection service
+projectpath = /blog/category/spam-detection-service/
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+For the first mini nlp project we will create a spam detection service for
+use with email systems and probably any system. Our purpose is to create
+an HTTP endpoint (REST service) that will be managing models (create /
+train / classify / delete). The classifier will be a binary classifier
+with the class names being SPAM and [HAM](http://wiki.apache.org/spamassassin/Ham)
+for spam and not spam accordingly.
+
+The purpose of the service we will create is not to make well known
+anti-spam services obsolete, it is to create a good starting ground for
+using NlpTools for Bayesian classification and for creating a custom
+classifier that given a specific context (and extra work by you) could
+even outperform well known solutions.
+
+### Classification model to use ###
+
+At the time of writing, NlpTools only supports two models __Naive Bayes__
+and __Maximum Entropy__ (conditional exponential model). Although Maximum
+Entropy models are known to perform better at most NLP tasks I will be
+using NaiveBayes for the following reasons:
+
+1. NB is a lot less computationally intensive to train than MaxEnt
+2. Because of reason 1 we can use pure php and still create a usable for real world scenarios service
+3. We can incrementally train a NB model without keeping all the previous documents (we will be keeping a training context)
+
+### Service overview ###
+
+We want to be able to perform the following functions
+
+1. Create a model
+2. Train a model on a set of emails (report emails as spam)
+3. Classify a set of emails
+4. Delete a model
+
+This means we will at least have 4 endpoints at our RESTful service. Let's
+also use JSON as the only transport format so as to not complicate things.
+
+### Tools ###
+
+We will now setup our environment. Besides the obvious, NlpTools, we will
+also be using [Silex](http://silex.sensiolabs.org/) to help us out with building
+our service. We will be installing both using [composer](http://getcomposer.org/doc/00-intro.md).
+Create a directory to hold the project (ex.: spam-service), then create a _composer.json_ .
+
+~~~
+{
+	"require": {
+		"silex/silex": "1.0.*@dev",
+		"nlp-tools/nlp-tools": "1.0.*@dev"
+	},
+	"autoload": {
+		"psr-0": {"": "web/"}
+	}
+}
+~~~
+
+It is also obvious from the above composer.json file that we will be
+coding in the _web_ directory and that our code namimg conventions will
+comply to the psr-0 standard. Now run composer to install silex and
+NlpTools and their dependencies. If you don't have composer run the following.
+
+
+~~~
+$ curl -s http://getcomposer.org/installer | php
+$ composer.phar install
+~~~
+
+Finally, for the first part we need to setup a webserver that will serve
+our spam service. [Silex documentation](http://silex.sensiolabs.org/doc/web_servers.html)
+has plenty of information to setup silex to play with any webserver. I
+will add the config file I am using for nginx.
+
+~~~
+server {
+	listen localhost:80;
+	server_name 127.0.0.1;
+
+	location / {
+		# example: unix:/var/run/php-fpm/www.sock
+		fastcgi_pass unix:/path/to/spam-service/spam-service.sock;
+		include fastcgi_params;
+		# replace /path/to/spam-service with whatever directory you
+		# created to put the project in
+		fastcgi_param SCRIPT_FILENAME /path/to/spam-service/web/index.php;
+	}
+}
+~~~

@@ -1,0 +1,152 @@
+---
+[metadata]
+title=Feature Factories
+documentation=1
+[options]
+layout=layouts/page.php
+---
+
+> In machine learning and pattern recognition, a [__feature__](http://en.wikipedia.org/wiki/Feature_(machine_learning))
+> is an individual measurable heuristic property of a phenomenon being
+> observed.
+> <cite>Wikipedia</cite>
+
+In NlpTools features are an array of either values or values paired with
+a weight. Features can be thought of as a set of functions and their
+return values. The feature array is an array of the functions that fired.
+If the value of each function is always 0 or 1 then the feature array is
+a sparse matrix with only the function names of the functions that return 1.
+
+For example a common set of features for NLP is the set of the words that
+are contained in the Document. Those features can be thought of as the
+functions "Is 'worda' found in the document?". Those features model the
+presence of the words in the Document.
+
+### Types of Feature Arrays ###
+
+Both Maxent and Naive Bayes receive feature arrays that are the set of
+the names of the functions that returned 1. Both feature presence and
+feature frequency can be modeled using this type of feature array.
+
+Naive Bayes is usually trained with feature frequency, which means that
+in the feature array one function can exist many times, while Maxent is
+trained with feature presence.
+
+### Feature Factory Interface ###
+
+~~~ php
+interface FeatureFactory
+{
+	/*
+	 * Return an array with unique strings that are the features that
+	 * "fire" for the specified Document $d and class $class
+	 * 
+	 * name: getFeatureArray
+	 * @return array
+	 */
+	public function getFeatureArray($class, Document $d);
+}
+~~~
+
+### Callables as Features ###
+
+FunctionFeatures is a class that receives a number of callbacks the
+returns of which after they have been merged and made unique (which
+models presence) is the feature array.
+
+The example that follows showcases the use of the class FunctionFeatures.
+See also [Documents](/documentation/documents.html) and [Tokenizers](/documentation/tokenizers.html).
+
+~~~ php
+use NlpTools\FeatureFactories\FunctionFeatures;
+use NlpTools\Tokenizers\WhitespaceTokenizer;
+use NlpTools\Documents\Document;
+use NlpTools\Documents\WordDocument;
+// Define your features
+$feats = new FunctionFeatures();
+$feats->add(function ($class,Document $d) {
+	// this feature is the presence of the word
+	return current($d->getDocumentData());
+});
+$feats->add(function ($class,Document $d) {
+	// this feature is the function 'is the word capitalized?'
+	$w = current($d->getDocumentData());
+	if (ctype_upper($w[0]))
+		return "isCapitalized";
+});
+
+// tokenize the data and create documents
+$text = "Please allow me to introduce myself
+        I'm a man of wealth and taste";
+
+$tokenizer = new WhitespaceTokenizer();
+$tokens = $tokenizer->tokenize($text);
+$documents = array();
+foreach ($tokens as $index=>$token)
+{
+	$documents[$index] = new WordDocument($tokens,$index,5);
+}
+
+// print the features that fired for each document given the class '0'
+echo implode(
+	PHP_EOL,
+	array_map(
+		function ($d) use($feats) {
+			return '['.implode(
+				',',
+				$feats->getFeatureArray('0',$d)
+			).']';
+		},
+		$documents
+	)
+);
+~~~
+
+### Data as Features ###
+
+This simple feature factory returns all the document data as features.
+It is very useful for a quick and dirty Naive Bayes for example.
+
+This feature factory could easily be implemented (although it would model
+presence while it now models frequency) with the following.
+
+~~~ php
+use NlpTools\FeatureFactories\FunctionFeatures;
+use NlpTools\FeatureFactories\TokensDocument;
+
+$feats = new FunctionFeatures();
+$feats->add(function ($class,TokensDocument $d) {
+	return $d->getDocumentData();
+});
+~~~
+
+### What is the class argument ###
+
+In case you did not check, the feature factory, except the Document, also
+takes a class parameter. This is to create features that only fire for
+certain classes (commonly used in Maxent).
+
+An easy way to create features that fire only for a given class is to
+prepend the class name to the feature name.
+
+~~~ php
+use NlpTools\FeatureFactories\FunctionFeatures;
+use NlpTools\FeatureFactories\TokensDocument;
+
+$feats = new FunctionFeatures();
+$feats->add(function ($class,TokensDocument $d) {
+	// prepend the class name in each 
+	return array_map(
+		function ($token) use($class) {
+			return $class.$token;
+		}.
+		$d->getDocumentData()
+	);
+});
+~~~
+
+<div style="text-align: center;" markdown="1">
+[&laquo; Documents](documentation/documents.html)
+/
+[Classifiers &raquo;](documentation/classifiers.html)
+</div>

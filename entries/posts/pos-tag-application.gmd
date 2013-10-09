@@ -1,0 +1,206 @@
+---
+[metadata]
+created = Sun, Jul 21 2013 10:13 UTC
+
+title = Tagging parts of speech in Greek
+project = Greek POS Tagger
+projectpath = /blog/category/greek-pos-tagger
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+In this final post I will present a usable pos tagger model and cli application with **93.2%** accuracy in
+tagging parts of speech on the held out test set (improving noticeably on the results of the thesis
+I base my work on).
+
+### Features ###
+
+1. The word
+2. One, Two and Three letter suffixes
+3. The word without the above suffixes
+4. The previous word
+5. The next word
+6. If the word contains a number
+7. If the word is one letter
+
+~~~ php
+function ($class, $doc) {
+	list($w, $prev, $next) = $doc->getDocumentData();
+	$features = array();
+	$len = mb_strlen($w, "utf-8");
+
+	// the actual word in lower case
+	$features[] = "$class ^ ".mb_strtolower($w,"utf-8");
+
+	if ($len>3) {
+		// the word's suffixes
+		$features[]="$class ^ sub(-1)=".mb_strtolower(mb_substr($w,-1, 3, "utf-8"), "utf-8");
+		$features[]="$class ^ sub(-2)=".mb_strtolower(mb_substr($w,-2, 3, "utf-8"), "utf-8");
+		$features[]="$class ^ sub(-3)=".mb_strtolower(mb_substr($w,-3, 3, "utf-8"), "utf-8");
+	}
+
+	// the words without the suffixes
+	if ($len>5)
+		$features[] = "$class ^ pre(-3)=".mb_strtolower(mb_substr($w, 0, -3, "utf-8"), "utf-8");
+	if ($len>4)
+		$features[] = "$class ^ pre(-2)=".mb_strtolower(mb_substr($w, 0, -2, "utf-8"), "utf-8");
+	if ($len>3)
+		$features[] = "$class ^ pre(-1)=".mb_strtolower(mb_substr($w, 0, -1, "utf-8"), "utf-8");
+
+	// the previous word
+	if (isset($prev[0]))
+		$features[] = "$class ^ ctx(-1)=".mb_strtolower($prev[0],"utf-8");
+
+	// the next word
+	if (isset($next[0]))
+		$features[] = "$class ^ ctx(1)=".mb_strtolower($next[0],"utf-8");
+	
+	if (preg_match("/\d/u",$w))
+		$features[] = "$class ^ has_number";
+
+	if (mb_strlen($w,"utf-8")==1)
+		$features[] = "$class ^ one_letter";
+
+	return $features;
+}
+~~~
+
+### Code ###
+
+The code (not the models) can be found [at github](https://github.com/angeloskath/pos-tag/). Most
+of the contents of the repository are for the console application. There are two files that might
+interest anyone who wants to extend the tagger,
+ [PosTagger.php](https://github.com/angeloskath/pos-tag/blob/master/src/PosTagger.php)
+and [PosTrainingSet.php](https://github.com/angeloskath/pos-tag/blob/master/src/PosTrainingSet.php).
+
+### Models ###
+
+I am publishing one model trained on both the test set and the training set, on a total of 31554 tokens.
+The complete model is **77MB** serialized and contains more than **half a million** features. Although it contains
+all the information learned from the training it is impractical to use and with a little bit of pruning
+we can keep the same level of accuracy with one fifth the model size and startup time.
+
+Thus, I will publish here 4 different files. 'model.bin' is the complete model. Each one of the others
+named 'model_thre_{num}.bin' with num being a variable number is simply produced from model.bin after
+removing all features with value less than or equal to {num}.
+
+<table class="small-table" style="width: 550px; margin: 0 auto;">
+	<tr>
+		<td><strong>File</strong></td>
+		<td><strong>Size in bytes</strong></td>
+		<td><strong>Size in features</strong></td>
+		<td><strong>Accuracy in training set</strong></td>
+	</tr>
+	<tr>
+		<td markdown="1">[model.bin](/files/pos-tag/models/model.bin)</td>
+		<td>77M</td>
+		<td>~ 500K</td>
+		<td>99.974%</td>
+	</tr>
+	<tr>
+		<td markdown="1">[model_thre_0.09.bin](/files/pos-tag/models/model_thre_0.09.bin)</td>
+		<td>17M</td>
+		<td>~ 132K</td>
+		<td>99.974%</td>
+	</tr>
+	<tr>
+		<td markdown="1">[model_thre_0.49.bin](/files/pos-tag/models/model_thre_0.49.bin)</td>
+		<td>6.2M</td>
+		<td>~ 52K</td>
+		<td>99.974%</td>
+	</tr>
+	<tr>
+		<td markdown="1">[model_thre_0.99.bin](/files/pos-tag/models/model_thre_0.99.bin)</td>
+		<td>3.2M</td>
+		<td>~ 31K</td>
+		<td>99.822%</td>
+	</tr>
+</table>
+
+-
+
+### Usage ###
+
+You can dowload the code from github and run composer install or download a usable (and executable)
+[phar archive](/files/pos-tag/pos-tag.phar).
+
+~~~ bash
+git clone https://github.com/angeloskath/pos-tag.git
+cd pos-tag/
+composer install
+~~~
+
+#### With code ####
+
+~~~ php
+// require("phar://pos-tag.phar/vendor/autoload.php");
+require("vendor/autoload.php");
+
+$tagger = new \PosTagger();
+$tagger->loadModelFromFile("path/to/model.bin");
+
+// $tok = new NlpTools\Tokenizers\WhitespaceTokenizer();
+// $tokens = $tok->tokenize("Η καλή μας αγελάδα βόσκει κάτω στην λιακάδα");
+// $tokens = $tok->tokenize("The quick brown fox jumped over the lazy dog");
+
+$tokens = array("Η","καλή","μας","αγελάδα","βόσκει","κάτω","στην","λιακάδα");
+$tags = $tagger->tag($tokens);
+
+echo implode(" ",$tags), PHP_EOL;
+// article adjective pronoun noun verb adverb article noun
+~~~
+
+#### With the console app #### 
+
+Download the console application and the models.
+
+~~~ bash
+# download the console app
+wget http://php-nlp-tools.com/files/pos-tag/pos-tag.phar -O pos-tag
+chmod +x pos-tag
+
+# download the model
+wget http://php-nlp-tools.com/files/pos-tag/models/model_thre_0.49.bin -O model.bin
+~~~
+
+Now you can tag plain text in Greek. Examples:
+
+~~~ bash
+# -m model.bin is not necessary because model.bin is the default
+./pos-tag tag -m model.bin "Η καλή μας αγελάδα βόσκει κάτω στην λιακάδα"
+# Assuming greek_text is a file containing some text in greek.
+./pos-tag tag <greek_text
+
+# You can see a pretty useful help message for every command
+./pos-tag help tag
+./pos-tag help features
+
+# and of course you will see a list of available commands if
+# you simply run the app
+./pos-tag
+
+# now follows an example tagging the first greek text that
+# I found in one of the open tabs in my browser
+./pos-tag tag -o "<w> <info><t></info><n>" "Το σώμα κειμένων του Ινστιτούτου Επεξεργασίας του Λόγου αναπτύχθηκε επί σειρά ετών και σήμερα περιλαμβάνει περισσότερες από 47.000.000 λέξεις"
+Το article
+σώμα noun
+κειμένων noun
+του article
+Ινστιτούτου noun
+Επεξεργασίας noun
+του article
+Λόγου noun
+αναπτύχθηκε verb
+επί preposition
+σειρά noun
+ετών noun
+και conjunction
+σήμερα adverb
+περιλαμβάνει verb
+περισσότερες adjective
+από preposition
+47.000.000 numeral
+λέξεις noun
+~~~

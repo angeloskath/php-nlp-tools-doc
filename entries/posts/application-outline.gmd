@@ -1,0 +1,277 @@
+---
+[metadata]
+created = Tue, Mar 19 2013 11:57 UTC
+
+title = Application outline
+project = Spam detection service
+projectpath = /blog/category/spam-detection-service/
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+In the second post about this project, I will outline the silex
+application and the input/output formats of the RESTful service.
+
+### Input ###
+
+The email input format as it has been [previously](/posts/NB-incremental-training.html)
+mentioned will be in JSON. We will only be receiving the sender's email,
+the subject and the body of the email. Each endpoint that receives emails
+as input will be receiving many emails as an array.
+
+~~~
+{
+	"documents": [
+		{
+			"from": "example@example.com",
+			"subject": "Test subject",
+			"body": "Lorem ipsum dolor sit amet...",
+			"class": "HAM"
+		},
+		{
+			"from": "example@spam.com",
+			"subject": "Cheap phones",
+			"body": "Lorem ipsum dolor sit amet...",
+			"class": "SPAM"
+		},
+		...
+		...
+		...
+	]
+}
+~~~
+
+If the emails are not for training but for classification, the class
+attribute will be ignored.
+
+### Output ###
+
+The app's response will always be in JSON too. We will be either outputing
+an error message in the following form (with HTTP status 5xx or 4xx of
+course)
+
+~~~
+{
+	"error": "This is a message"
+}
+~~~
+
+or an array of labels with HTTP status 200
+
+~~~
+["HAM","SPAM",....]
+~~~
+
+or an empty body with an informative HTTP status (like 204).
+
+### Bootstraping ###
+
+Below follows the skeleton of our service's code. There are two functions
+that train the models (train_new, retrain) and both return a model and a
+training context (so that we can perform incremental training).
+
+~~~ php
+require __DIR__.'/../vendor/autoload.php';
+
+// Silex
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+// NlpTools
+use NlpTools\Models\FeatureBasedNB;
+use NlpTools\Documents\TrainingSet;
+use NlpTools\FeatureFactories\DataAsFeatures;
+use NlpTools\Classifiers\MultinomialNBClassifier;
+
+/*
+ * Train a model
+ * */
+ function train_new(Request $req) {
+	...
+ }
+ function retrain(FeatureBasedNB $model,array &$ctx, Request $req) {
+	...
+ }
+
+// new App
+$app = new Silex\Application();
+
+// a UID provider
+$app->register(new UIDServiceProvider());
+
+// a middleware to parse json requests to array
+$app->before(function (Request $req) {
+	if (substr($req->headers->get('Content-Type'),0,16) === 'application/json') {
+		$data = json_decode($req->getContent(),true);
+		$req->request->replace(is_array($data) ? $data : array());
+	}
+});
+
+// Create a new model
+$app->post('/models',function (Request $req) use($app) {
+	...
+});
+
+// Check if a model exists
+$app->get('/{uid}',function (Request $req,$uid) use($app) {
+	...
+})->assert('uid','[0-9a-f]+');
+
+// Delete an existing model
+$app->delete('/{uid}',function (Request $req,$uid) use($app) {
+	...
+})->assert('uid','[0-9a-f]+');
+
+// Report a number of emails as spam or not
+$app->post('/{uid}/report',function (Request $req,$uid) use($app) {
+	...
+})->assert('uid','[0-9a-f]+');
+
+// Classify a set of documents
+$app->post('/{uid}/classify',function (Request $req,$uid) use($app) {
+	...
+})->assert('uid','[0-9a-f]+');
+
+$app->run();
+~~~
+
+Let's take each endpoint in turns.
+
+### POST /models ###
+
+Posting to _/models_ creates a new model and trains it if emails are
+provided. _$app['UID']_ is a unique id provider. A folder is created
+for the model and two files one representing the model and another the
+training context. Both files contain Base64 encoded serialized php arrays
+or objects.
+
+~~~ php
+// Create a new model
+$app->post('/models',function (Request $req) use($app) {
+	$uid = $app['UID']();
+	
+	if ( file_exists("models/$uid") )
+	{
+		return $app->json(
+			array (
+				"error"=>"Could not allocate a unique id for the new model"
+			),
+			500
+		);
+	}
+	if ( !mkdir("models/$uid") )
+	{
+		return $app->json(
+			array (
+				"error"=>"Could not allocate a unique id for the new model"
+			),
+			500
+		);
+	}
+	
+	list($model,$ctx) = train_new($req);
+	if ($ctx !== null)
+		file_put_contents("models/$uid/ctx",base64_encode(serialize($ctx)));
+	file_put_contents("models/$uid/model",base64_encode(serialize($model)));
+	
+	return $app->json(
+		array(
+			"id" => $uid
+		),
+		201
+	);
+});
+~~~
+
+### GET /{uid} ###
+
+This endpoint simply returns 204 if the model was found or 404 if it
+was not.
+
+### DELETE /{uid} ###
+
+This edpoint simply deletes the model if it exists or returns a 404 error
+otherwise.
+
+### POST /{uid}/report ###
+
+This endpoint is used to further train the model. The model is unserialized
+from the files and if a context exists is trained incrementally, otherwise
+is trained from scratch.
+
+~~~ php
+$app->post('/{uid}/report',function (Request $req,$uid) use($app) {
+	if (!file_exists("models/$uid"))
+	{
+		return $app->json(
+			array('error'=>'Model not found'),
+			404
+		);
+	}
+	if (!file_exists("models/$uid/ctx"))
+	{
+		list($model,$ctx) = train_new($req);
+		if ($ctx === null)
+			return $app->json(array('error'=>'No documents were reported'),400);
+		file_put_contents("models/$uid/ctx",base64_encode(serialize($ctx)));
+		file_put_contents("models/$uid/model",base64_encode(serialize($model)));
+	}
+	else
+	{
+		$ctx = unserialize(base64_decode(file_get_contents("models/$uid/ctx")));
+		$model = unserialize(base64_decode(file_get_contents("models/$uid/model")));
+		if (!retrain($model,$ctx,$req))
+			return $app->json(array('error'=>'No documents were reported'),400);
+		file_put_contents("models/$uid/ctx",base64_encode(serialize($ctx)));
+		file_put_contents("models/$uid/model",base64_encode(serialize($model)));
+	}
+	return new Response('',204);
+})->assert('uid','[0-9a-f]+');
+~~~
+
+### POST /{uid}/classify ###
+
+This endpoint actually uses the model to classify a set of documents
+(emails). We will be talking about __EmailFeatures, EmailDocument__ in
+the next post.
+
+~~~ php
+$app->post('/{uid}/classify',function (Request $req,$uid) use($app) {
+	if (!file_exists("models/$uid"))
+	{
+		return $app->json(
+			array('error'=>'Model not found'),
+			404
+		);
+	}
+	$response = array();
+	if ($req->request->has('documents') && is_array($req->request->get('documents')))
+	{
+		// create the feature factory
+		$ff = new EmailFeatures();
+		// get the model from the file
+		$model = unserialize(base64_decode(file_get_contents("models/$uid/model")));
+		// create a classifier
+		$cls = new MultinomialNBClassifier($ff,$model);
+		
+		// for each document
+		foreach ($req->request->get('documents') as $doc)
+		{
+			// create an email document because that is what
+			// EmailFeatures expects
+			$email = new EmailDocument(
+				$doc['from'],
+				$doc['subject'],
+				$doc['body']
+			);
+			// actually use the model to predict the class of this EmailDocument
+			$response[] = $cls->classify(array('SPAM','HAM'),$email);
+		}
+	}
+	// show the predictions
+	return $app->json($response);
+})->assert('uid','[0-9a-f]+');
+~~~
+

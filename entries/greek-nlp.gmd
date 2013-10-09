@@ -1,0 +1,51 @@
+----
+[metadata]
+title=Επεξεργασία της Ελληνικής φυσική γλώσσας
+[options]
+layout=layouts/page.php
+----
+
+Όντας μία μικρή χώρα με μία περίπλοκη και μοναδική γλώσσα είναι αναμενόμενο να υστερούμε σημαντικά σε εργαλεία και πληροφορίες για την ανάλυση των Ελληνικών με υπολογιστές.
+Σκοπός αυτής της σελίδας είναι να συγκεντρώσει πληροφορίες και εργαλεία για NLP στα Ελληνικά (corpus lists, έτοιμα μοντέλα, stemmers, gazeteers κτλ).
+
+Θα χαρώ πολύ αν επικοινωνήσετε μαζί μου στο [info@php-nlp-tools.com](mailto:info@php-nlp-tools.com) είτε για να μοιραστείτε κάποια εργαλεία, πληροφορίες, κώδικα κτλ είτε για
+συζητήσουμε για την υλοποίηση κάποιων αλγορίθμων στην βιβλιοθήκη.
+
+### POS Taggers ###
+
+Πιο ελληνικά, επισημειωτές μερών του λόγου. Για τον επισημειωτή των NlpTools μπορείτε να [διαβάσετε παραπάνω στο
+blog](/blog/category/greek-pos-tagger).
+
+* [NlpTools pos-tag](/files/pos-tag/pos-tag.phar) (η εφαρμογή) και τα
+  μοντέλα
+  * [model.bin (complete)](/files/pos-tag/models/model.bin)
+  * [model_thre_0.09.bin](/files/pos-tag/models/model_thre_0.09.bin)
+  * [model_thre_0.49.bin (recommended)](/files/pos-tag/models/model_thre_0.49.bin)
+  * [model_thre_0.99.bin](/files/pos-tag/models/model_thre_0.99.bin)
+* [AUEB's POS Tagger](http://nlp.cs.aueb.gr/software_and_datasets/AUEB_POS_tagger_2_2_alpha.tar.gz)
+
+
+### Stemmers ###
+
+#### NlpTools ####
+
+Δεν υπάρχει ακόμη κάποιος stemmer υλοποιημένος. Να υλοποιηθεί κάποιος από τους από κάτω; Ίσως όλοι;
+
+#### Papers ####
+
+* Γεώργιος Νταής, Master Thesis, 2006 [[pdf](http://people.dsv.su.se/~hercules/papers/Ntais_greek_stemmer_thesis_final.pdf)]
+* Σπυρίδων Σαρούκος, Master Thesis, 2008 [[pdf](http://tutkielmat.uta.fi/pdf/gradu03463.pdf)]
+
+### Gazeteers ###
+
+* [Λίστα ελληνικών ονομάτων](/files/greek-nlp/gazeteers/names.csv) (την συνέλεξε και την επεξεργάστηκε ο κύριος [Φουνταλής](http://www.foundalis.com/grk/EllinikaOnomata.html))
+
+
+### Corpus ###
+
+* [Εθνικός Θησαυρός της Ελληνικής Γλώσσας](http://hnc.ilsp.gr/)
+
+### Χρήσιμα Link ###
+
+* [Τμήμα Φυσικής Γλώσσας και Εξαγωγής Γνώσης](http://www.ilsp.gr/el/profile/research-departments/natural-language-and-knowledge-extraction-department)
+* [Ομάδα Επεξεργασίας Φυσικής Γλώσσας](http://nlp.cs.aueb.gr/index_gr.html) Οικονομικό Πανεπιστήμιο Αθηνών

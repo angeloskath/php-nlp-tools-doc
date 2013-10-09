@@ -1,0 +1,76 @@
+----
+[metadata]
+title=Natural language processing tools
+[options]
+layout=layouts/page.php
+----
+
+NlpTools is a library for natural language processing written in php. Its
+development is driven by my own needs for text classification,
+clustering, tokenizing, stemming etc.
+
+### A tiny working example ###
+
+~~~ php
+include('vendor/autoload.php');
+
+function getWikipediaPage($page) {
+	ini_set('user_agent', 'NlpToolsTest/1.0 (tests@php-nlp-tools.com)');
+	$page = json_decode(file_get_contents("http://en.wikipedia.org/w/api.php?format=json&action=parse&page=".urlencode($page)),true);
+	return preg_replace('/\s+/',' ',strip_tags($page['parse']['text']['*']));
+}
+
+use NlpTools\Tokenizers\WhitespaceTokenizer;
+use NlpTools\Similarity\CosineSimilarity;
+
+$tokenizer = new WhitespaceTokenizer();
+$sim = new CosineSimilarity();
+
+$aris = $tokenizer->tokenize(getWikipediaPage('Aristotle'));
+$archi = $tokenizer->tokenize(getWikipediaPage('Archimedes'));
+$einstein = $tokenizer->tokenize(getWikipediaPage('Albert Einstein'));
+
+$aris_to_archi = $sim->similarity(
+	$aris,
+	$archi
+);
+
+$aris_to_albert = $sim->similarity(
+	$aris,
+	$einstein
+);
+
+var_dump($aris_to_archi,$aris_to_albert);
+~~~
+
+### Get it ###
+
+You can get it at [github](http://github.com/angeloskath/php-nlp-tools)
+or through packagist (which I recommend).
+
+~~~
+{
+	"require": {
+		"nlp-tools/nlp-tools": "1.0.*@dev"
+	}
+}
+~~~
+
+
+### Purpose of this site ###
+
+Besides being a space on the internet for a library I believe it is
+useful enough to be shared, I will be hosting here documentation and a
+blog that will describe step by step small nlp projects using this library.
+
+### License ###
+
+NlpTools is released under the most permissive license in the world, the
+[wtfpl](http://www.wtfpl.net/).
+
+### Sum up ###
+
+NlpTools is still under development and there could be plenty of
+features missing, if you find yourself needing something that NlpTools
+doesn't currently provide you'd have to code it yourself and I would
+be glad if you offered it back to the project.

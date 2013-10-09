@@ -1,0 +1,152 @@
+---
+[metadata]
+created = Sun, Jul 21 2013 10:13 UTC
+
+title = Evaluating features with Naive Bayes
+project = Greek POS Tagger
+projectpath = /blog/category/greek-pos-tagger
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+Following Evangelia's paper  we will be using a Maxent model for our final prediction model.
+But training Maxent models is an order of magnitude slower than training a Naive Bayes model. We could simply
+implement the features defined in the paper and train one final model, but because I want to gain a better
+understanding of the POS tagger I will be implementing them one at a time and evaluating each time the improvement.
+To avoid waiting, I will be using a simple Naive Bayes model.
+
+### Only the data as features ###
+
+If we simply train a Naive Bayes model with the only features the presence of the words themselves then we have a model
+that does not differ much from our baseline. Only one feature fires for each word and for the unknown words the prior
+gets to decide the class (actually the results would be identical if it were not for smoothing the model).
+
+Consequently the results are a model with a bit worse accuracy than the baseline but with much the same behaviour (it
+still mistakes half the verbs for nouns).
+
+### Options at hand ###
+
+Up until now the features do not rely at all on our knowledge as a linguist or even on our knowledge of the greek
+language. As a matter of fact we could create such a baseline parser in any language just by feeding it a big
+pre-annotated corpus.
+
+To improve further we will have to add features that more or less depend on our knowledge of the task of recognizing
+parts of speech. For instance the knowldge that the ending of verbs is an important characteristic of the greek
+language or that if the previous word is "την" (an article) it is very unlikely that an article will follow.
+
+We can separate the features in two categories.
+
+* Contextual
+* Language based
+
+We will of course add features of both types in the end, but I would like to discuss the differences of those two
+categories. I believe they deserve to be in different categories because they rely on different knowledge of the
+language.
+
+The contextual features are features that try to exploit the fact that combinations of words have meaning
+e.g. "from the house" and "to the house" have exactly the opposite meaning. Contextual features can be generic, they
+will always carry information about the current word, regardless the language.
+
+Language based methods rely on our knowledge of the specific language (or family of languages) that we are targeting.
+e.g. The fact that if the suffix of the word is 'ω' the word is probably a verb.
+
+Contemplating on the Brill Tagger, what I have been describing above are rules that could be used in such a tagger.
+For this machine learning based tagger we will describe (in code) the way of coming up with rules and then the model,
+through the training process, will evaluate which rules are successful and should be relied upon and which are not.
+
+For instance we will *not* be using as a feature the following function 'ends_in_omega' but the function 'last_char'.
+
+~~~php
+// not a good feature that only checks one possible
+// suffix and relies on our expert knowledge that this
+// suffix is important
+function ends_in_omega($w) {
+	return mb_substr($w,-1,1,'utf-8')=='ω';
+}
+
+// a good feature. It does not rely at all on our
+// knowledge of a specific suffix. It simply asks for
+// the model to evaluate if a suffix is important for
+// a specific part of speech
+function last_char($w) {
+	return mb_substr($w,-1,1,'utf-8');
+}
+~~~
+
+### Actually trying out features ###
+
+#### Data ####
+
+I have already mentioned that having only the data as features results in
+a slightly worse result than our baseline due to model smoothing.
+
+~~~php
+function ($class, $doc) {
+	list($w) = $doc->getDocumentData();
+	return mb_strtolower($w,"utf-8");
+}
+~~~
+
+#### Suffixes ####
+
+Using the last three letters of the word should drastically improve the
+performance of our tagger because it shall now recognize the common suffixes
+produced by the greek grammatical conjugation, thus it shall improve upon the
+most important flaw of our tagger, the huge misclassification of verbs.
+
+~~~php
+function ($class, $doc) {
+    list($w) = $doc->getDocumentData();
+    if (mb_strlen($w,"utf-8")<=3)
+        return;
+    $suffixes = array();
+    $suffixes[] = 'substr(-1) = '.mb_strtolower(mb_substr($w,-1, 3, "utf-8"), "utf-8");
+    $suffixes[] = 'substr(-2) = '.mb_strtolower(mb_substr($w,-2, 3, "utf-8"), "utf-8");
+    $suffixes[] = 'substr(-3) = '.mb_strtolower(mb_substr($w,-3, 3, "utf-8"), "utf-8");
+    return $suffixes;
+}
+~~~
+
+Indeed those features improve the accuracy from the baseline (Data only) 80.6% to
+87% and most importantly they improve verb's recall from 49.47% to 95.59% .
+
+#### Context ####
+
+Using the context of the two surrounding words we expect a general improvement
+on the quality of the tagging not specific to any part of speech.
+
+~~~php
+function ($class, $doc) {
+    list($w,$prev,$next) = $doc->getDocumentData();
+    $f = array();
+
+    for ($i=0;$i<count($prev);$i++) {
+        $f[]= "prev($i) = {$prev[$i]}";
+    }
+    for ($i=0;$i<count($next);$i++) {
+        $f[] = "next($i) = {$next[$i]}";
+    }
+
+    return $f;
+},
+~~~
+
+What we are actually getting though is more complex than that. If applying this
+feature on the baseline we will see a decrease in accuracy from 80.6% to 78.7%.
+Yet, with a second look we can see that the quality of the tagging has increased.
+The mistakes are spread out more (instead of being clustered on the nouns (not
+necessarily a good thing)) and we can now identify approximately 80% of the verbs
+instead of 50%.
+
+In addition, if combined with the suffixes feature the overall accuracy increases
+to 88.3% from 87%.
+
+### In the next post ###
+
+In the next and last post of this series I will present all the feature functions,
+package the tagger code in a github repository and package the trained model for
+ease of use (maybe even a cli application).
+
+

@@ -1,0 +1,172 @@
+---
+[metadata]
+created = Sat, Mar 30 2013 11:59 UTC
+
+title = Sentiment detection
+project = Sentiment detection
+projectpath = /blog/category/sentiment-detection
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+We will be doing a bit of sentiment detection using NlpTools and aim at
+recreating the results of a popular sentiment classification paper
+of *[Bo Pang][pang-homepage], [Lillian Lee][lee-hompage], and Shivakumar Vaithyanathan,
+"[Thumbs up? Sentiment Classification using Machine Learning Techniques][pang-lee-paper]"*
+
+### Getting and preparing the dataset ###
+
+The dataset that we will be using is [the polarity dataset v2.0][dataset]
+found [here][movie-review-data]. The dataset is a collection of movie
+reviews from [imdb](http://imdb.com), already labeled and **tokenized**.
+NlpTools does not have any tools for model evaluation so we will have to
+code our own manually for this mini nlp project.
+
+We will use 10-fold [cross-validation](http://en.wikipedia.org/wiki/Cross-validation).
+We will be creating lists of files split for training and evaluation.
+I am assuming that you are using either Linux or Mac, if that is not the
+case, really sorry, you can either download the lists from [here][data-set-lists]
+and replace \_DIR\_ with the path to the files or write a script to create
+them on your own.
+
+First we will create a list of all the files and shuffle it. Run the
+following commands in a terminal, one directory above the neg and pos
+directories.
+~~~ bash
+ls neg/ | xargs -I file echo `pwd`/neg/file >> /tmp/imdb.list
+ls pos/ | xargs -I file echo `pwd`/pos/file >> /tmp/imdb.list
+shuf /tmp/imdb.list >/tmp/imdb-shuffled.list
+for i in {200..2000..200};do p=$(($i/200)); head -n $i /tmp/imdb-shuffled.list | tail -n 200 >test_$p ;done
+for i in {200..2000..200};do p=$(($i/200)); s=$(($i-200)); e=$((2000-$i)); head -n $s /tmp/imdb-shuffled.list >train_$p; tail -n $e /tmp/imdb-shuffled.list >>train_$p; done
+~~~
+
+We now have 20 files named test_\*, train_\* that contain lists to the
+documents to be used for each fold. We will next code a function to
+create a training set from a list of documents.
+
+~~~ php
+use NlpTools\Tokenizers\WhitespaceTokenizer;
+use NlpTools\Documents\TokensDocument;
+use NlpTools\Documents\TrainingSet;
+
+function create_training_set($fname) {
+	$tset = new TrainingSet();
+	$tok = new WhitespaceTokenizer();
+	$subs = function ($s) { return substr($s,0,-1); };
+	array_walk(
+		array_filter( // filter empty lines (''==false)
+			array_map( // map $subs to remove new line from the end
+				$subs,
+				file($fname)
+			)
+		),
+		function ($file) use($tset,$tok) {
+			$tset->addDocument(
+				(strpos($file,'pos')===FALSE) ? 'neg' : 'pos',
+				new TokensDocument(
+					$tok->tokenize(
+						file_get_contents($file)
+					)
+				)
+			);
+		}
+	);
+	return $tset;
+}
+~~~
+
+### Classification ###
+
+In this post we will train a [Naive Bayes model][nb-api-docs] without
+removing stopwords and/or infrequent words as done by Pang, Lee. We will
+be using frequency of [unigrams][n-gram-wiki].
+
+Let's set things up.
+
+~~~ php
+
+include('vendor/autoload.php');
+include('create_training_set.php');
+
+$train = $argv[1]; // the first parameter is the training set list file
+$test = $argv[2]; // the second parameter is the test set list file
+
+// ... check if the files are ok ...
+
+// use the function we coded above to create the sets of documents
+$training_set = create_training_set($train);
+$test_set = create_test_set($test);
+~~~
+
+Now that we have created the training/test sets we must train our model.
+Firstly we will decide what [features](/documentation/feature-factories.html)
+to use and whether we will create our own feature factory or use one
+provided by NlpTools. Since we want to simply use as features the
+frequency of unigrams we can use *[DataAsFeatures][data-api-docs]*.
+
+Let's train our model.
+
+~~~ php
+$feature_factory = new DataAsFeatures();
+$model = new FeatureBasedNB();
+$model->train($feature_factory, $training_set);
+~~~
+
+Now we should evaluate our trained model on the test set. We will use
+the simple measure of accuracy (correct/total) as used by Pang, Lee in
+their paper.
+
+~~~ php
+// counter of correct predictions
+$correct = 0;
+// the classifier
+$cls = new MultinomialNBClassifier($feature_factory, $model);
+$classes = $test_set->getClassSet();
+foreach ($test_set as $class=>$doc) {
+	// predict a class for this doc
+	$prediction = $cls->classify(
+		$classes,
+		$doc
+	);
+	// if correct add one to the counter
+	$correct += (int)($prediction==$class);
+}
+
+echo ((float)$correct)/count($test_set), PHP_EOL;
+~~~
+
+Now to run the script, if we have saved the above 3 snippets in a file
+named nb.php, we can simply write the following in a terminal.
+
+~~~ bash
+php nb.php path/to/train_1 path/to/test_1
+~~~
+
+And to run the crossvalidation (replace the "data/" with the path that
+train_* is in).
+
+~~~ bash
+echo "(`for i in {1..10}; do php nb.php data/train_$i data/test_$i; done | paste -sd+`)*10" | bc
+~~~
+
+Using [these lists][data-set-lists] (you need to replace \_DIR\_ with the
+path to the files), my model has an accuracy of 81.85%, which is
+actually quite better than 78.7 percent that was achieved by 3-fold
+crossvalidation in Pang and Lee 's paper.
+
+### Maxent ###
+
+In the next post on this topic we will train a maximum entropy model
+and see if we can push this 81.85% any further.
+
+[pang-homepage]: http://research.yahoo.com/Bo_Pang
+[lee-hompage]: http://www.cs.cornell.edu/home/llee
+[pang-lee-paper]: http://www.cs.cornell.edu/home/llee/papers/sentiment.home.html
+[dataset]: http://www.cs.cornell.edu/people/pabo/movie-review-data/review_polarity.tar.gz
+[movie-review-data]: http://www.cs.cornell.edu/people/pabo/movie-review-data/
+[nb-api-docs]: /documentation/api/#NlpTools\Models\FeatureBasedNB
+[data-api-docs]: /documentation/api/#NlpTools\FeatureFactories\DataAsFeaturess
+[n-gram-wiki]: http://en.wikipedia.org/wiki/N-gram
+[data-set-lists]: /files/sentiment-detection/dataset_lists.zip
