@@ -1,0 +1,144 @@
+---
+[metadata]
+created = Tue, Nov 12 2013 23:45 UTC
+
+title = Source classifier in PHP
+project = Programming language detection
+projectpath = /blog/category/programming-language-detection/
+
+type = post
+[options]
+layout=layouts/page.php
+---
+
+Recently I had the need to identify the programming language of several snippets of
+code without relying on the file extension. I originally thought that it would be trivial
+to find code that does exactly that but as it turns out I have only found one
+[implementation in Ruby][ruby_source_classifier]. Thus, I decided to write my own [source classifier
+in php][php_source_classifier].
+
+### Finding a dataset ###
+
+The hardest part was to find and download a dataset for use with the classifier. I decided
+to download sources from Google code jam 2013 solutions. This decision was made for the following
+two simple reasons, firstly I would use the model to classify similar types of source code
+(small solutions to programming problems) and secondly it provides easy access to many different
+programming languages.
+
+The quality of the produced classifier heavily depends on the dataset so one could improve
+the performance of the provided model by training on a different dataset.
+
+### Classification model and Features ###
+
+Since it seemed to work well for [Mr Chris Lowis][chrislo_github] I decided to use the same
+simple Naive Bayes model. The sources are read as is, they are **not** normalized. I use
+the [WhitespaceAndPunctuationTokenizer](/documentation/tokenizers.html) to split the sources
+into tokens.
+
+The feature factory is a simple frequency feature factory that cuts off the maximum frequency
+at 4 occurences.
+
+~~~ php
+class CodeFeatures implements FeatureFactoryInterface
+{
+	public function getFeatureArray($class, DocumentInterface $doc)
+	{
+		$tokens = $doc->getDocumentData();
+		$tokens = array_count_values($tokens);
+
+		foreach ($tokens as $tok=>&$v) {
+			$v = min($v, 4);
+		}
+
+		return $tokens;
+	}
+}
+~~~
+
+### Using the LanguageDetector ###
+
+I have wrapped the [MultinomialNBClassifier](/documentation/classifiers.html) in a class
+to ease its use, its training and its serialization.
+
+~~~ php
+$detector = LanguageDetector::loadFromFile("/path/to/model");
+$lang = $detector->classify(<<<CODE
+#include <stdio.h>
+
+int main() {
+	printf("Hello world!");
+}
+CODE
+);
+echo $lang, PHP_EOL; // C
+~~~
+
+In the [github repository][php_source_classifier] there is already a pretrained model that
+classifies among the following languages (the popular ones according to Google code jam):
+
+ * C
+ * C#
+ * C++
+ * Clojure
+ * Go
+ * Haskell
+ * Java
+ * Javascript
+ * MATLAB
+ * Pascal
+ * Perl
+ * PHP
+ * Python
+ * Ruby
+ * Scala
+ * Visual Basic
+
+### Train on your own files ###
+
+In the repo there is also a bin directory that provides a *lang-detect* script. It is a simple
+script that allows training of new models on new datasets, evaluation of models and using a model
+to classify a file as a source code.
+
+Examples:
+
+~~~ bash
+# retrain the provided model
+bin/lang-detect train "data/train"
+
+# evaluate the trained model
+bin/lang-detect evaluate "data/test" # should print 0.98
+
+# classify some code
+bin/lang-detect classify "some/path/code.cpp"
+~~~
+
+The structure of the directories for training and evaluating should be one subdirectory
+per class and each subdirectory should contain one file per document (one source file).
+You can see an example of the above structure in the data/train and data/test directories.
+
+### Future work ###
+
+Since it is a much less interesting and unimportant problem than the ones I usually like to
+battle with in my free time I have left a lot of concepts unexplored and went for the fastest
+half good solution (although it turned out better than half good).
+
+One should be able to get much better results by changing both the feature factory and the tokenizer.
+
+#### Tokenizer ####
+
+The tokenizer should probably be able to understand different types of strings and ignore them or mark
+them as "string". Maybe the same should apply to comments as well. Operators, parentheses and brackets
+should be parsed as separate tokens but not every single punctuation character. Some could be grouped
+like -> or =>.
+
+#### Feature factory ####
+
+As far as the feature factory is concerned, document frequency dictionaries could be used to emphasize
+to the keywords per class and differentiate them from the identifiers. Words at the beginning and ending
+of the document should be weighted differently as they are intuitively more important in
+differentiating the programming languages (imports, opening/closing tags, etc). Finally statistics about
+the identifiers could be collected, for instance whether camel casing or underscores are preferred.
+
+[php_source_classifier]: https://github.com/angeloskath/php-sourceclassifier
+[ruby_source_classifier]: https://github.com/chrislo/sourceclassifier
+[chrislo_github]: https://github.com/chrislo
