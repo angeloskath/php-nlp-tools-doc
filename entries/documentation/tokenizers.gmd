@@ -20,7 +20,7 @@ we will be applying it to the tokens and not the original text.
 The tokenizer interface is a very simple one with only one method.
 
 ~~~ php
-interface Tokenizer
+interface TokenizerInterface
 {
 	/*
 	 * @param string $str The text for tokenization
@@ -40,6 +40,8 @@ The following tokenizers reside in the _\NlpTools\Tokenizers_ namespace.
 1. WhitespaceTokenizer
 2. WhitespaceAndPunctuationTokenizer
 3. ClassifierBasedTokenizer
+4. RegexTokenizer
+5. PennTreeBankTokenizer
 
 ~~~ php
 use \NlpTools\Tokenizers\WhitespaceTokenizer;
@@ -68,6 +70,9 @@ $punct->tokenize($s);
 $clstok->tokenize($s);
 // output depends on the classifier
 ~~~
+
+Although WhitespaceTokenizer and WhitespaceAndPunctuationTokenizer are
+straight forward the rest of them need a bit of separate mention.
 
 ### Classifier based tokenization ###
 
@@ -143,6 +148,62 @@ combine tokens from another tokenizer into larger tokens.
    "End of word" and O stands for "Other".
 3. Join all O tokens up to an EOW token using a given separator (any
    character sequence)
+
+### RegexTokenizer ###
+
+This tokenizer tokenizes text based on a set of regexes. The regexes
+are passed as a constructor parameter and can have the following
+three forms.
+
+1. A simple string
+2. An array of a string and an integer
+3. An array of two strings
+
+Each case is handled differently by the tokenizer. In the first case
+the input will be split using preg_split and the provided string as
+pattern. In the second case the integer denotes the subpattern to keep
+and the first the pattern to be used with preg_match. Finally in the
+third case preg_replace is used and the matches are replaced with the
+second string.
+
+The results of each regex are then passed to the next as a pipeline.
+
+~~~ php
+use NlpTools\Tokenizers\RegexTokenizer;
+
+$s = "Please allow me to introduce myself 
+        I'm a man of wealth and taste";
+
+$rtok = new RegexTokenizer(array(
+	array("/\s+/"," "),              // replace many spaces with a single space
+	array("/'(m|ve|d|s)/", " '\$1"), // split I've, it's, we've, we'd, ...
+	"/ /"                            // split on every space
+));
+
+print_r($rtok->tokenize($s));
+// Array
+// (
+//     [0] => Please
+//     [1] => allow
+//     [2] => me
+//     [3] => to
+//     [4] => introduce
+//     [5] => myself
+//     [6] => I
+//     [7] => 'm
+//     [8] => a
+//     [9] => man
+//     [10] => of
+//     [11] => wealth
+//     [12] => and
+//     [13] => taste
+// )
+~~~
+
+### Treebank tokenization ###
+
+This is a very popular tokenization for the english language. We use the Penn
+treebank tokenization for which you can read more at [upenn.edu](http://www.cis.upenn.edu/~treebank/tokenization.html).
 
 <div style="text-align: center;" markdown="1">
 [&laquo; Getting started](documentation/)

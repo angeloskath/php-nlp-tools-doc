@@ -13,7 +13,7 @@ context or maybe a whole email with metadata about previous conversations.
 ### The Document interface ###
 
 ~~~ php
-interface Document
+interface DocumentInterface
 {
 	/*
 	 * Return the data of what is being represented. If it were a word
@@ -30,17 +30,26 @@ Document is very generic and it can return anything as its data. It
 is, though, useful to design generic document classes that can be used
 by purpose-specific [feature factories](documentation/feature-factories.html).
 
-With the mindset expressed above, NlpTools already contains two generic
+With the mindset expressed above, NlpTools contains three generic
 document types that could be used for many applications.
 
 1. TokensDocument
 2. WordDocument
+3. RawDocument
+
+Documents also get to decide how to apply a [transformation](/documentation/transformations.html).
+For instance to apply a stemmer to a document one need not know
+how is the data structured in the document but can simply delegate
+the that to the document instance.
 
 ### TokensDocument ###
 
 TokensDocument is useful for feature factories and algorithms that use
 the ["Bag of words"]() model for representing a large group of text.
 It wraps an array of tokens and simply returns this array as the data.
+
+When applying a transformation it applies it to every single token removing
+the ones which are transformed to null.
 
 To continue the tokenizers' example.
 
@@ -66,6 +75,9 @@ WordDocument represents a single token (usually a word) surrounded by a
 token context of some length. It is useful for representing certain
 elements, like person names, places, etc, in the context of a larger
 piece of text.
+
+Also as the TokensDocument this document applies a transformation to
+each token separately and removes the nulls.
 
 To illustrate the difference from above.
 
@@ -99,6 +111,11 @@ $doors = new WordDocument(
 Because we have also captured the context of those words, above, we can
 distinguish them and produce different features.
 
+### RawDocument ###
+
+RawDocument wraps a single php variable. The transformations are, as is
+expected, applied to the variable.
+
 ### Training document and Training set ###
 
 In the Documents namespace there exist two more classes created to make
@@ -120,7 +137,8 @@ var_dump($td->getDocumentData()); // $d->getDocumentData()
 _TrainingSet_ is a TrainingDocument container. Besides adding an easier
 way of instanciating TrainingDocuments it also provides the useful
 \Iterator, \ArrayAccess and \Countable interfaces for manipulating many
-TrainingDocuments .
+TrainingDocuments and it allows for an easy way to apply a transformation
+to every single document.
 
 ~~~ php
 $tset = new TrainingSet();
@@ -128,6 +146,7 @@ $tset->addDocument('CLASS 1',$a);
 foreach ($tset as $class=>$d) {
 	...
 }
+$tset->applyTransformations(array($transform1, $transform2, ...));
 ~~~
 
 <div style="text-align: center;" markdown="1">

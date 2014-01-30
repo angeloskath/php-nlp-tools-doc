@@ -35,7 +35,7 @@ trained with feature presence.
 ### Feature Factory Interface ###
 
 ~~~ php
-interface FeatureFactory
+interface FeatureFactoryInterface
 {
 	/*
 	 * Return an array with unique strings that are the features that
@@ -51,8 +51,13 @@ interface FeatureFactory
 ### Callables as Features ###
 
 FunctionFeatures is a class that receives a number of callbacks the
-returns of which after they have been merged and made unique (which
-models presence) is the feature array.
+returns of which after they have been merged is the feature array.
+
+The class can be asked to model presence or frequency using the methods
+`modelPresence` and `modelFrequency`. If the class models presence then
+it returns an array of feature names that "fired" while if it models
+frequency it returns an array of key-value pairs where keys are the feature
+names and the values are the number of times a feature "fired".
 
 The example that follows showcases the use of the class FunctionFeatures.
 See also [Documents](/documentation/documents.html) and [Tokenizers](/documentation/tokenizers.html).
@@ -100,6 +105,12 @@ echo implode(
 		$documents
 	)
 );
+
+// print the features with their frequencies
+$feats->modelFrequency();
+print_r(
+	$feats->getFeatureArray('0', $d)
+);
 ~~~
 
 ### Data as Features ###
@@ -108,7 +119,7 @@ This simple feature factory returns all the document data as features.
 It is very useful for a quick and dirty Naive Bayes for example.
 
 This feature factory could easily be implemented (although it would model
-presence while it now models frequency) with the following.
+presence by default while it now models frequency) with the following.
 
 ~~~ php
 use NlpTools\FeatureFactories\FunctionFeatures;

@@ -15,12 +15,12 @@ transformed into other).
 We have two interfaces Similarity and Distance.
 
 ~~~ php
-interface Distance
+interface DistanceInterface
 {
 	public function dist(array &$setA, array &$setB);
 }
 
-interface Similarity
+interface SimilarityInterface
 {
 	public function similarity(array &$setA, array &$setB);
 }

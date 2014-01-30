@@ -1,0 +1,189 @@
+---
+[metadata]
+title=Transformations
+documentation=1
+[options]
+layout=layouts/page.php
+---
+
+In any machine learning task, including natural language processing, a big
+amount of preprocessing work is required as well as feature engineering.
+
+NlpTools has [Feature Factories][feature_factories_link] for feature
+engineering and lately it has added a TransformationInterface for general
+preprocessing work.
+
+~~~ php
+interface TransformationInterface
+{
+    /**
+     * Return the value transformed.
+     * @param  mixed $value The value to transform
+     * @return mixed
+     */
+    public function transform($value);
+}
+~~~
+
+Again the interface is very generic that gives to the library a lot of
+flexibility. Below I will list several classes that implement the
+aforementioned interface and can be used with the [documents][documents_link]
+for easy preprocessing.
+
+### [Stemmers][stemmers_link] ###
+
+> In linguistic morphology and information retrieval, stemming is the process for
+> reducing inflected (or sometimes derived) words to their stem, base or root
+> form—generally a written word form.
+> <cite>Wikipedia</cite>
+
+Stemmers can be used either via the TransformationInterface above or standalone
+via the stem function.
+
+Available stemmers in NlpTools
+
+* [PorterStemmer](/documentation/api/#NlpTools\Stemmers\PorterStemmer)
+* [LancasterStemmer](/documentation/api/#NlpTools\Stemmers\LancasterStemmer)
+* [RegexStemmer](/documentation/api/#NlpTools\Stemmers\RegexStemmer)
+* [GreekStemmer](/documentation/api/#NlpTools\Stemmers\GreekStemmer)
+
+~~~ php
+use NlpTools\Stemmers\PorterStemmer;
+use NlpTools\Documents\TokensDocument;
+
+$s = "People are strange when you 're a stranger
+	  faces look ugly when you 're alone";
+
+$stemmer = new PorterStemmer();
+
+// standalone usage
+print_r($stemmer->stemAll(explode(" ", $s)));
+
+// usage via TransformationInterface
+$d = new TokensDocument(explode(" ", $s));
+$d->applyTransformation($stemmer);
+print_r($d->getDocumentData());
+~~~
+
+### [Stop words][stop_words_link] ###
+
+Words that are filtered out because they do not add any value to the meaning of
+the text.
+
+~~~ php
+use NlpTools\Utils\StopWords;
+use NlpTools\Documents\TokensDocument;
+
+$s = "People are strange when you 're a stranger
+	  faces look ugly when you 're alone";
+
+$stop = new StopWords(array(
+	"are",
+	"you",
+	"'re",
+	"a"
+));
+
+$d = new TokensDocument(explode(" ", $s));
+$d->applyTransformation($stop);
+print_r($d->getDocumentData());
+~~~
+
+### [Normalizers][normalizers_link] ###
+
+A Normalizer's purpose is to transform any word from any one of the possible
+writings to a single writing consistently. Most stemming algorithms expect
+normalized text anyway.
+
+The most common normalization would be to transform the words to lower case.
+There are languages though that this is not enough since there may be other
+diacritics that need to be removed.
+
+Available normalizers exist for the following languages
+
+* English
+* Greek
+
+~~~ php
+use NlpTools\Utils\Normalizers\Normalizer;
+use NlpTools\Documents\TokensDocument;
+
+$s = "People Are Strange WhEn you 're A Stranger
+	  faces look Ugly when you 're Alone";
+
+$norm = Normalizer::factory("English");
+
+// standalone usage
+print_r($norm->normalizeAll(explode(" ", $s)));
+
+// usage via TransformationInterface
+$d = new TokensDocument(explode(" ", $s));
+$d->applyTransformation($norm);
+print_r($d->getDocumentData());
+~~~
+
+### [Classifier Based Transformation][classifier_based_transform_link] ###
+
+This transformation classifies the input passed, and then applies a different set of
+transformations depending on the class of the input.
+
+A simple use could be to create a multilingual transformation pipeline that
+applies different set of preprocessors (different stop words, stemmers, etc)
+depending on the language of the input document.
+
+~~~ php
+use NlpTools\Classifiers\ClassifierInterface;
+use NlpTools\Utils\ClassifierBasedTransformation;
+use NlpTools\Stemmers;
+use NlpTools\Utils\Normalizers\Normalizer;
+use NlpTools\Utils\StopWords;
+use NlpTools\Documents\TokensDocument;
+
+class LanguageDetector extends ClassifierInterface
+{
+	...
+}
+$lang_detector = new LanguageDetector(...);
+
+$greek = array(
+	Normalizer::factory("Greek"),
+	new StopWords(
+		explode(
+			"\n",
+			file_get_contents("greek_stop_words")
+		)
+	),
+	new Stemmers\GreekStemmer()
+);
+
+$english = array(
+	Normalizer::factory("English"),
+	new StopWords(
+		explode(
+			"\n",
+			file_get_contents("english_stop_words")
+		)
+	),
+	new Stemmers\PorterStemmer()
+);
+
+$transform = new ClassifierBasedTransformation($lang_detector);
+$transform->register("English", $english);
+$transform->register("Greek", $greek);
+
+$s = "This text contains both Ελληνικά and English";
+$d = new TokensDocument(explode(" ", $s));
+$d->applyTransformation($transform);
+print_r($d->getDocumentData());
+~~~
+
+<div style="text-align: center;" markdown="1">
+[&laquo; Clustering](/documentation/clustering.html)
+</div>
+
+[feature_factories_link]: /documentation/feature-factories.html
+[documents_link]: /documentation/documents.html
+[stemmers_link]: /documentation/api/#NlpTools\Stemmers
+[stop_words_link]: /documentation/api/#NlpTools\Utils\StopWords
+[normalizers_link]: /documentation/api/#NlpTools\Utils\Normalizers
+[classifier_based_transform_link]: /documentation/api/#NlpTools\Utils\ClassifierBasedTransformation

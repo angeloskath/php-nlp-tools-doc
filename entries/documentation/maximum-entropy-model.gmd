@@ -22,7 +22,7 @@ by Stanford.
 
 Because training a maximum entropy model is not as trivial as training a
 Naive Bayes model, [Maxent](documentation/api/#NlpTools\Models\Maxent)
-also takes a [MaxentOptimizer](documentation/api/#NlpTools\Optimizers\MaxentOptimizer)
+also takes a [MaxentOptimizer](documentation/api/#NlpTools\Optimizers\MaxentOptimizerInterface)
 as a third parameter.
 
 ### Example use ###

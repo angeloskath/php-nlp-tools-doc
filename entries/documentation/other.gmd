@@ -1,0 +1,109 @@
+---
+[metadata]
+title=Other
+documentation=1
+[options]
+layout=layouts/page.php
+---
+
+In this page there will be documentation that is either incomplete or the part
+of the library being documented does not require a complete separate section.
+
+### [Inverse document frequency][idf_link] ###
+
+NlpTools\Analysis\Idf is a class that implements the inverse document frequency
+measure. The inverse document frequency is a measure of how common or rare a
+term T is inside a collection of documents. Terms that are rare tend to be more
+important for some tasks, especially for information retrieval.
+
+Idf requires a TrainingSet (and a FeatureFactory to translate the document data
+to feature vectors) upon construction and afterwards it can be used as an array
+via the ArrayAccess php interface. The values of the array return the inverse
+document frequency of the term (feature). It can be used in another feature
+factory to create weighted feature vectors.
+
+~~~ php
+use NlpTools\Documents\DocumentInterface;
+use NlpTools\Documents\TrainingSet;
+use NlpTools\Documents\TokensDocument;
+use NlpTools\FeatureFactories\FunctionFeatures;
+use NlpTools\Analysis\Idf;
+
+class TfIdfFeatureFactory extends FunctionFeatures
+{
+	protected $idf;
+
+	public function __construct(Idf $idf, array $functions)
+	{
+		parent::__construct($functions);
+		$this->modelFrequency();
+		$this->idf = $idf;
+	}
+
+	public function getFeatureArray($class, DocumentInterface $doc)
+	{
+		$frequencies = parent::getFeatureArray($class, $doc);
+		foreach ($frequencies as $term=>&$value) {
+			$value = $value*$this->idf[$term];
+		}
+		return $frequencies;
+	}
+}
+
+$tset = new TrainingSet();
+$tset->addDocument(
+	"",
+	new TokensDocument(
+		explode(
+			" ",
+			"Don't go around saying the world owes you a living . The world owes you nothing . It was here first ."
+		)
+	)
+);
+$tset->addDocument(
+	"",
+	new TokensDocument(
+		explode(
+			" ",
+			"Go to Heaven for the climate , Hell for the company ."
+		)
+	)
+);
+$tset->addDocument(
+	"",
+	new TokensDocument(
+		explode(
+			" ",
+			"If you tell the truth , you don't have to remember anything ."
+		)
+	)
+);
+
+$idf = new Idf($tset);
+$ff = new TfIdfFeatureFactory(
+	$idf,
+	array(
+		function ($c, $d) {
+			return $d->getDocumentData();
+		}
+	)
+);
+
+print_r($ff->getFeatureArray("", $tset[0]));
+~~~
+
+### [Latent Dirichlet Allocation][lda_link] ###
+
+Latent dirichlet allocation is a topic model that aims to identify
+distributions over words as topics and then distributions over topics for the
+documents. It is a very useful and relatively new model that deserves a
+separate mention in the documentation similar to the mention for the Bayesian
+model and the Maxent model.
+
+The best resource for examples is the [functional test][lda_test_link] and the
+[blog post][lda_blog_link] written when the model was first coded.
+
+[idf_link]: /documentation/api/#NlpTools\Analysis\Idf
+[lda_link]: /documentation/api/#NlpTools\Models\Lda
+[lda_blog_link]: /posts/introducing-latent-dirichlet-allocation.html
+[lda_test_link]: https://github.com/angeloskath/php-nlp-tools/blob/develop/tests/NlpTools/Models/LdaTest.php

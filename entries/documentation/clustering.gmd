@@ -12,13 +12,14 @@ layout=layouts/page.php
 > <cite>Wikipedia</cite>
 
 The [NlpTools\Clustering][clustering_namespace] namespace will contain a number of clustering
-algorithms to be used with the library. At the moment of writing this, K-Means is the only algorithm
-published in the master branch with hierarchical clustering soon to follow and Expectation
-Maximization a bit later.
+algorithms to be used with the library. Currently it contains:
+
+1. K-Means
+2. Hierarchical Agglomerative Clustering
 
 ### Interfaces ###
 
-All clustering methods extends the abstract class [Clusterer][clusterer] and implement the following
+All clustering classes extend the abstract class [Clusterer][clusterer] and implement the following
 abstract method.
 
 ~~~ php
@@ -111,18 +112,99 @@ print_r(
 );
 ~~~
 
+### Hierarchical Clustering ###
+
+NlpTools implements hierarchical agglomerative clustering. This clustering method
+works in the following steps. Each datapoint starts at its own cluster. Then
+a merging strategy is initialized (usually this initialization includes computing
+a dis-/similarity matrix). Then iteratively two clusters are merged until only one
+cluster remains.
+
+~~~ php
+class Hierarchical extends Clusterer
+{
+	public function __construct(
+		MergeStrategyInterface $ms,
+		DistanceInterface $d
+	)
+	{
+		...
+	}
+}
+~~~
+
+The cluster method does not return grouped indices of the training set's documents but
+instead it returns a [dendrogram](http://en.wikipedia.org/wiki/Dendrogram) which can be
+easily cut into any number of clusters using the static method
+`dendrogramToClusters($tree, $clustercount)`.
+
+#### Merge Strategies ####
+
+The merge strategies need to implement the following interface.
+
+~~~ php
+interface MergeStrategyInterface
+{
+	/**
+     * Study the docs and preprocess anything required for
+     * computing the merges
+     */
+    public function initializeStrategy(DistanceInterface $d, array &$docs);
+
+    /**
+     * Return the next two clusters for merging and assume
+     * they are merged (ex. update a similarity matrix)
+     *
+     * @return array An array with two numbers which are the cluster ids
+     */
+    public function getNextMerge();
+
+}
+~~~
+
+The merge strategies available in NlpTools are the following.
+
+* SingleLink
+* CompleteLink
+* GroupAverage
+
+You can see examples of using hierarchical clustering in 
+[NlpTools' tests](https://github.com/angeloskath/php-nlp-tools/blob/develop/tests/NlpTools/Clustering/HierarchicalTest.php) or the following small example.
+
+~~~ php
+use NlpTools\Clustering\Hierarchical;
+use NlpTools\Clustering\MergeStrategies\SingleLink;
+use NlpTools\Similarity\Euclidean;
+use NlpTools\FeatureFactories\DataAsFeatures;
+
+$clust = new Hierarchical(
+	new SingleLink(),
+	new Euclidean()
+);
+
+// Assuming $tset is the same from the above example in K-Means
+$dendrogram = $clust->cluster($tset, new DataAsFeatures());
+
+print_r($dendrogram);
+print_r(Hierarchical::dendrogramToClusters($dendrogram, 2));
+
+~~~
+
+
 <div style="text-align: center;" markdown="1">
-[&laquo; Similarity](documentation/similarity.html)
+[&laquo; Similarity](/documentation/similarity.html)
+/
+[Transformations &raquo;](/documentation/transformations.html)
 </div>
 
-[clustering_namespace]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering
-[clusterer]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\Clusterer
+[clustering_namespace]: /documentation/api/#NlpTools\Clustering
+[clusterer]: /documentation/api/#NlpTools\Clustering\Clusterer
 [kmeans_wiki]: http://en.wikipedia.org/wiki/Kmeans
 [similarity_docs]: /documentation/similarity.html
 [centroid_factories_docs]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories
 [euclidean_cf]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories\Euclidean
 [hamming_cf]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories\Hamming
 [mean_angle_cf]: http://php-nlp-tools.local/documentation/api/#NlpTools\Clustering\CentroidFactories\MeanAngle
-[kmeans_example]: https://github.com/angeloskath/php-nlp-tools/tree/master/tests/clustering/kmeans/kmeans_test.php
+[kmeans_example]: https://github.com/angeloskath/php-nlp-tools/blob/develop/tests/NlpTools/Clustering/KmeansTest.php
 
 

@@ -18,7 +18,7 @@ all the data of a new observation and returns a predicted class for
 the Document.
 
 ~~~ php
-interface Classifier
+interface ClassifierInterface
 {
 	/**
 	 * Decide in which class C member of $classes would $d fit best.
@@ -44,7 +44,7 @@ that maximizes the vote is the predicted class.
 ### Multinomial Naive Bayes Classifier ###
 
 This classifier also needs a [Feature Factory](documentation/feature-factories.html).
-In addition it needs a [Multinomial Naive Bayes Model](documentation/api/#NlpTools\Models\MultinomialNBModel).
+In addition it needs a [Multinomial Naive Bayes Model](documentation/api/#NlpTools\Models\MultinomialNBModelInterface).
 
 You can find a thorough explanation of this method by the [Stanford NLP department](http://nlp.stanford.edu/IR-book/html/htmledition/naive-bayes-text-classification-1.html).
 

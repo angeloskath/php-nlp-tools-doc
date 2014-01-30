@@ -10,7 +10,7 @@ NlpTools, for now at least, only implements the Naive Bayes model. The
 interface of the model is the following.
 
 ~~~ php
-interface MultinomialNBModel
+interface MultinomialNBModelInterface
 {
 	public function getPrior($class);
 	public function getCondProb($term,$class);
