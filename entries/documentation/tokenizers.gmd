@@ -79,7 +79,7 @@ straight forward the rest of them need a bit of separate mention.
 The constructor of the ClassifierBasedTokenizer looks like this
 
 ~~~ php
-class ClassifierBasedTokenizer implements Tokenizer
+class ClassifierBasedTokenizer implements TokenizerInterface
 {
 	public function __construct(Classifier $cls, Tokenizer $tok=null,$sep=' ') {
 		...
@@ -101,12 +101,12 @@ include ('vendor/autoload.php');
 
 use \NlpTools\Tokenizers\ClassifierBasedTokenizer;
 use \NlpTools\Tokenizers\WhitespaceTokenizer;
-use \NlpTools\Classifiers\Classifier;
-use \NlpTools\Documents\Document;
+use \NlpTools\Classifiers\ClassifierInterface;
+use \NlpTools\Documents\DocumentInterface;
 
-class EndOfSentence implements Classifier
+class EndOfSentence implements ClassifierInterface
 {
-	public function classify(array $classes, Document $d) {
+	public function classify(array $classes, DocumentInterface $d) {
 		list($token,$before,$after) = $d->getDocumentData();
 		
 		$dotcnt = count(explode('.',$token))-1;
